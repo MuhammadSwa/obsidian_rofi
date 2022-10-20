@@ -53,7 +53,9 @@ But Now the process goes something like this.
 
 ---
 
-There are others things I do with bash. functions like quick-capture,quick-append,search-query,open
+There are others things I do with bash. functions like quick-capture,quick-append,search-query,open. I just wanted this to be quickly share this maybe someone find it useful for their obsidian workflow
+
+- Of course if you are going to use it there are some variables that you need to change like the vaultPath var for example
 
 ---
 
