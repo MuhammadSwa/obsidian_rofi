@@ -1,0 +1,188 @@
+#!/bin/bash
+# For more about this script: TODO <url>
+##############################
+
+# The full path of your vault
+vaultPath="$HOME"/MyVault
+
+##############################
+# rofi configuration. Make it behave like dmenu
+# Arguments:
+#   strings for the prompt
+rofiDmenu()(
+    rofi -i -matching fuzzy -dmenu -p "$@"
+)
+
+##############################
+# find all files in vault and pipe it to rofi. Only searches for files that has the .md file extension.
+# exclude any directory that starts with a dot like .git .trash.
+# Globals:
+#   vaultPath
+findAllFiles()(
+    find "$vaultPath" -type f ! -path '*/\.*' -name "*\.md" \
+        |  rofi -no-plugins -dmenu -i -matching fuzzy -p "Search Vault" -no-custom -keep-right
+)
+
+##############################
+# find all the directories in the vault.
+# exclude any directory that starts with a dot like .git .trash.
+# Globals
+#   vaultPath
+findDirectories()(
+    find "$vaultPath" -type d ! -path '*/\.*' | rofiDmenu "Search Vault"
+)
+
+##############################
+# notify-send configuration
+# Arguments
+#   message of the notification
+notifySend()(
+    iconPath="$vaultPath/assets/obsidian-icon.png"
+    notify-send -a Obsidian -t 1000 -i "$iconPath" "$@"
+)
+
+##############################
+checkStatus(){
+    [[ $? -eq 1 ]] && exit 1
+}
+
+##############################
+# Add to your daily logs under the ## Log section
+# Globals
+#   vaultPath
+quickLog()(
+    # date format you use for daily notes, here it's ISO8601
+    dateFormat=$(date -I)
+    # relative path of The daily note template.
+    dailyTemplatePath="Templates/Daily Template.md"
+    # relative path of daily notes Folder
+    dailyFolder="journal"
+    # the header in your daily note you put your logs under
+    logHeader="## Daily Log"
+    logTemplate="- $(date +%H:%M)"
+
+    todaysNotePath="$vaultPath/$dailyFolder/$dateFormat.md"
+
+    logContent=$(rofiDmenu "Add a log")
+    checkStatus
+    # check if the daily note exits.If not copy the daily template in your daily note folder
+    [[ -f $todaysNotePath ]] || cp "$vaultPath/$dailyTemplatePath" "$todaysNotePath"
+    # If the header of the logs doesn't exist in the daily note, append the header to the note
+    grep -qc "$logHeader" "$todaysNotePath" || echo -e "\n$logHeader" >> "$todaysNotePath"
+    # add the log under the logHeader
+    sed -i "s/$logHeader/&\n$logTemplate $logContent/" "$todaysNotePath"
+    notifySend "Your log has been saved in $dailyFolder/$dateFormat"
+)
+
+##############################
+# add a task in the Tasks note. Each under its category.
+# Globals
+#   vaultPath
+quickTask()(
+    tasksNotePath="$vaultPath/Tasks📝.md"
+    # Tasks categories
+    categs=(College Family Work Health ProjectX)
+    chosencateg=$(printf "%s\n" "${categs[@]}" | rofiDmenu "choose a categ")
+    checkStatus
+    taskTemplate="- [ ] #task #$chosencateg"
+    categHeader="## $chosencateg"
+    taskContent=$(rofiDmenu "what's your task?")
+    checkStatus
+    # If the header of the category doesn't exist in the tasks note, append the header to the note
+    grep -qc "$categHeader" "$tasksNotePath" || echo -e "\n$categHeader" >> "$tasksNotePath"
+    # add the task under the categHeader
+    sed -i "s/$categHeader/&\n$taskTemplate $taskContent/" "$tasksNotePath"
+    notifySend "Task📝 Added under $categHeader"
+)
+
+##############################
+# add a note to the Inbox folder
+# Globals
+#   vaultPath
+quickCapture()(
+    # TODO This for forum: But you can use the findDirectories function
+    newNotePath="Inbox"
+    checkStatus
+    noteName=$(rofiDmenu "Note Name")
+    checkStatus
+    noteContent=$(rofiDmenu "Note Content")
+
+    notePath="$vaultPath/$newNotePath/$noteName.md"
+    touch "$notePath"
+    echo -e "$noteContent" >> "$notePath"
+    notifySend "$noteName Was created in $notePath"
+)
+
+##############################
+# append to a note in your vault.
+quickAppend()(
+    notePath=$(findAllFiles)
+    checkStatus
+    content=$(rofiDmenu "Content to append")
+    checkStatus
+    echo -e "\n$content" >> "$notePath"
+    notifySend "text was appended to $notePath"
+)
+
+##############################
+# choose a note to open
+open()(
+    chosenFile=$(findAllFiles)
+    checkStatus
+    xdg-open "obsidian://open?path=$chosenFile"
+)
+
+##############################
+# search for a query.
+searchQuery()(
+    query=$(rofiDmenu "query")
+    checkStatus
+    xdg-open "obsidian://search?query=$query"
+)
+
+
+##############################
+help()(
+    cat << EOF
+  Valid Arguments:
+    open
+    quick-task
+    quick-log
+    quick-capture
+    quick-append
+    search-query
+    help
+EOF
+)
+
+notValidArgument(){
+    echo "The Argument you've passed isn't valid"
+    help
+    exit 1
+}
+
+moreThanOneArgument(){
+    echo "You've passed more than one argument. Please pass only one"
+    help
+    exit 1
+}
+
+passedNoArgument(){
+    echo "Please pass an argument"
+    help
+    exit 1
+}
+
+[[ $# -gt 1 ]] && moreThanOneArgument
+[[ $# -eq 0 ]] && passedNoArgument
+
+case $1 in
+    open) open ;;
+    quick-task) quickTask ;;
+    quick-log) quickLog  ;;
+    quick-capture) quickCapture ;;
+    quick-append) append   ;;
+    search-query) searchQuery ;;
+    help) help ;;
+    *) notValidArgument ;;
+esac
